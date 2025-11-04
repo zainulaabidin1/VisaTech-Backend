@@ -19,6 +19,8 @@ router.put('/contact-info',validateContactInfo, updateContactInfo);
 router.get('/profile', getProfile);
 router.get('/all', getAllUsers); // For testing
 router.get('/:id', getUserById); // For testing
+router.put('/:id', updateUser);
+router.delete('/:id', deleteUser);
 router.put('/contact-info', validateContactInfo, updateContactInfo);
 
 module.exports = router;

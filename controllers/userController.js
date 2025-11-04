@@ -323,10 +323,99 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    console.log('📝 Updating user:', id, updateData);
+
+    const [affectedRows] = await User.update(updateData, {
+      where: { id }
+    });
+
+    if (affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const updatedUser = await User.findByPk(id, {
+      attributes: { exclude: ['password_hash'] }
+    });
+
+    console.log('✅ User updated successfully:', updatedUser.email);
+
+    res.json({
+      success: true,
+      message: 'User updated successfully',
+      data: { user: updatedUser }
+    });
+
+  } catch (error) {
+    console.error('❌ Update user error:', error);
+    
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed: ' + error.errors.map(e => e.message).join(', ')
+      });
+    }
+
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already exists in our system'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while updating user'
+    });
+  }
+};
+
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log('🗑️ Deleting user:', id);
+
+    const affectedRows = await User.destroy({
+      where: { id }
+    });
+
+    if (affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    console.log('✅ User deleted successfully:', id);
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Delete user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while deleting user'
+    });
+  }
+};
+
 module.exports = {
   updatePersonalInfo,
   updateContactInfo,
   getProfile,
   getUserById,
-  getAllUsers
+  getAllUsers,
+  updateUser,
+  deleteUser,
 };
