@@ -59,7 +59,6 @@ app.use((error, req, res, next) => {
     ...(process.env.NODE_ENV === 'development' && { error: error.message })
   });
 });
-
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {

@@ -40,6 +40,11 @@ const Passport = sequelize.define('Passport', {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   },
+   token_number: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true
+    },
   verification_status: {
     type: DataTypes.ENUM('pending', 'verified', 'rejected'),
     defaultValue: 'pending'

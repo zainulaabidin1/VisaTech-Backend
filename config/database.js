@@ -33,4 +33,21 @@ const testConnection = async () => {
   }
 };
 
-module.exports = { sequelize, testConnection };
+// Add this syncDB function
+const syncDB = async (options = {}) => {
+  try {
+    await sequelize.authenticate();
+    console.log('Database connected, starting sync...');
+    
+    // Use alter: true to add new columns without dropping data
+    await sequelize.sync({ alter: true, ...options });
+    
+    console.log('✅ Database synced successfully - token_number column added');
+    return true;
+  } catch (error) {
+    console.error('❌ Database sync failed:', error);
+    return false;
+  }
+};
+
+module.exports = { sequelize, testConnection, syncDB };

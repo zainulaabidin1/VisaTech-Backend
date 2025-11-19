@@ -5,7 +5,9 @@ const {
   updateContactInfo, 
   getProfile,
   getUserById,
-  getAllUsers 
+  getAllUsers,
+  updateUser,
+  deleteUser 
 } = require('../controllers/userController');
 const { validatePersonalInfo } = require('../middleware/validation');
 const { validateContactInfo } = require('../middleware/validation');

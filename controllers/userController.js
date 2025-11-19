@@ -1,4 +1,4 @@
-const { User, Passport, EmailVerification } = require('../models');
+const { sequelize, User, Passport, EmailVerification } = require('../models');
 const { Op } = require('sequelize');
 const { generateVerificationCode } = require('../utils/generateCode');
 const { sendVerificationEmail } = require('../utils/emailService');
@@ -304,7 +304,11 @@ const getAllUsers = async (req, res) => {
   try {
     const users = await User.findAll({
       attributes: { exclude: ['password_hash'] },
-      include: [{ model: Passport, as: 'passport' }],
+      include: [{ 
+        model: Passport, 
+        as: 'passport',
+        attributes: ['id', 'token_number', 'passport_number', 'nationality']
+      }],
       order: [['created_at', 'DESC']]
     });
 
@@ -326,11 +330,15 @@ const getAllUsers = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const { passport, ...userData } = req.body;
 
-    console.log('📝 Updating user:', id, updateData);
+    console.log('🔄 UPDATE USER REQUEST:');
+    console.log('User ID:', id);
+    console.log('Passport data:', passport);
+    console.log('Token number received:', passport?.token_number);
 
-    const [affectedRows] = await User.update(updateData, {
+    // Update user basic info
+    const [affectedRows] = await User.update(userData, {
       where: { id }
     });
 
@@ -341,11 +349,53 @@ const updateUser = async (req, res) => {
       });
     }
 
+    // Handle passport token number
+    if (passport && passport.token_number) {
+      console.log('📝 Processing token number:', passport.token_number);
+      
+      try {
+        // Check if passport exists for this user
+        let passportRecord = await Passport.findOne({
+          where: { user_id: id }
+        });
+
+        if (passportRecord) {
+          // Update existing passport
+          await Passport.update(
+            { token_number: passport.token_number },
+            { where: { user_id: id } }
+          );
+          console.log('✅ Updated existing passport with token number');
+        } else {
+          // Create new passport record
+          await Passport.create({
+            user_id: id,
+            token_number: passport.token_number,
+            passport_number: 'TEMP',
+            country: 'Unknown',
+            nationality: 'Unknown', 
+            date_of_birth: new Date(),
+            expiry_date: new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000),
+            sex: 'U',
+            passport_image_url: '',
+            is_verified: false,
+            verification_status: 'pending'
+          });
+          console.log('✅ Created new passport with token number');
+        }
+      } catch (passportError) {
+        console.error('❌ Passport error:', passportError);
+        // Continue even if passport fails
+      }
+    }
+
+    // Get updated user with passport
     const updatedUser = await User.findByPk(id, {
-      attributes: { exclude: ['password_hash'] }
+      attributes: { exclude: ['password_hash'] },
+      include: [{ model: Passport, as: 'passport' }]
     });
 
-    console.log('✅ User updated successfully:', updatedUser.email);
+    console.log('✅ Final user data with token:', updatedUser.passport?.token_number);
 
     res.json({
       success: true,
@@ -355,24 +405,19 @@ const updateUser = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Update user error:', error);
+    console.error('❌ Error name:', error.name);
+    console.error('❌ Error message:', error.message);
     
     if (error.name === 'SequelizeValidationError') {
       return res.status(400).json({
         success: false,
-        message: 'Validation failed: ' + error.errors.map(e => e.message).join(', ')
-      });
-    }
-
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already exists in our system'
+        message: 'Validation error: ' + error.errors.map(e => e.message).join(', ')
       });
     }
 
     res.status(500).json({
       success: false,
-      message: 'Internal server error while updating user'
+      message: 'Internal server error: ' + error.message
     });
   }
 };
