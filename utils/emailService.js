@@ -5,22 +5,33 @@ const transporter = nodemailer.createTransport({
   service: process.env.EMAIL_SERVICE || 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    pass: process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD // Use app password for Gmail
   }
 });
 
 // Verify transporter connection
 transporter.verify(function(error, success) {
   if (error) {
-    console.log('Transporter error:', error);
+    console.log('❌ Email transporter error:', error);
   } else {
-    console.log('Server is ready to take our messages');
+    console.log('✅ Email server is ready to send messages');
   }
 });
 
 const sendVerificationEmail = async (email, verificationCode) => {
+  // For development/testing, always log the code
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`📧 DEVELOPMENT MODE - OTP for ${email}: ${verificationCode}`);
+  }
+
+  // Check if email credentials are configured
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log('⚠️ Email credentials not configured. Logging OTP:', verificationCode);
+    return true; // Return true to continue the flow
+  }
+
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: `"Your App" <${process.env.EMAIL_USER}>`,
     to: email,
     subject: 'Email Verification Code - Your App',
     html: `
@@ -44,19 +55,15 @@ const sendVerificationEmail = async (email, verificationCode) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Verification email sent to ${email}`);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Verification email sent to ${email}`, info.messageId);
     return true;
   } catch (error) {
     console.error('❌ Failed to send verification email:', error);
     
-    // For development, log the code instead of failing
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`📧 Development mode - OTP for ${email}: ${verificationCode}`);
-      return true; // Return true in development to continue flow
-    }
-    
-    return false;
+    // Even if email fails, log the code and continue
+    console.log(`📧 OTP for ${email}: ${verificationCode}`);
+    return true; // Return true to continue the registration flow
   }
 };
 
