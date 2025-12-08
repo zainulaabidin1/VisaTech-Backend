@@ -43,7 +43,7 @@ const login = async (req, res) => {
       email: user.email,
       is_verified: user.is_verified,
       is_active: user.is_active,
-      hasPassword: !!user.password
+      hasPassword: !!(user.password || user.password_hash)  // Check both fields
     });
 
     // Check if user is active
@@ -66,33 +66,70 @@ const login = async (req, res) => {
 
     console.log('🔐 Checking password...');
     console.log('Input password length:', password.length);
-    console.log('Stored password:', user.password ? user.password.substring(0, 20) + '...' : 'N/A');
-    console.log('Is bcrypt hash?', user.password ? user.password.startsWith('$2') : 'N/A');
+    console.log('Stored password field:', user.password ? 'exists' : 'null/undefined');
+    console.log('Stored password_hash field:', user.password_hash ? 'exists' : 'null/undefined');
+    
+    // NEW: Check if user has a password at all
+    const hasPassword = !!(user.password || user.password_hash);
+    if (!hasPassword) {
+      console.log('❌ User has no password set');
+      return res.status(401).json({
+        success: false,
+        message: 'No password set for this account. Please use "Forgot Password" to set one.'
+      });
+    }
 
     let isPasswordValid = false;
     
-    // Check if password is a bcrypt hash
-    if (user.password && user.password.startsWith('$2')) {
-      // It's a bcrypt hash, compare normally
-      try {
-        isPasswordValid = await bcrypt.compare(password, user.password);
-        console.log('🔐 Bcrypt comparison result:', isPasswordValid);
-      } catch (bcryptError) {
-        console.error('❌ Bcrypt compare error:', bcryptError.message);
+    // Try password field first
+    if (user.password) {
+      if (user.password.startsWith('$2')) {
+        // It's a bcrypt hash
+        try {
+          isPasswordValid = await bcrypt.compare(password, user.password);
+          console.log('🔐 Bcrypt comparison result for password field:', isPasswordValid);
+        } catch (bcryptError) {
+          console.error('❌ Bcrypt compare error:', bcryptError.message);
+        }
+      } else {
+        // Password is plain text (for existing users before hashing)
+        isPasswordValid = password === user.password;
+        console.log('🔐 Plain text comparison result for password field:', isPasswordValid);
+        
+        // If valid, hash the password for future use
+        if (isPasswordValid) {
+          console.log('⚠️ Password is stored as plain text! Hashing it now...');
+          const salt = await bcrypt.genSalt(10);
+          const hashedPassword = await bcrypt.hash(password, salt);
+          await user.update({ password: hashedPassword, password_hash: hashedPassword });
+          console.log('✅ Password hashed and updated in database');
+        }
       }
-    } else if (user.password) {
-      // Password is plain text (for existing users before hashing)
-      // Compare directly (temporary solution - update your database!)
-      isPasswordValid = password === user.password;
-      console.log('🔐 Plain text comparison result:', isPasswordValid);
-      
-      // If valid, hash the password for future use
-      if (isPasswordValid) {
-        console.log('⚠️ Password is stored as plain text! Hashing it now...');
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-        await user.update({ password: hashedPassword });
-        console.log('✅ Password hashed and updated in database');
+    }
+    
+    // If password field didn't work, try password_hash field
+    if (!isPasswordValid && user.password_hash) {
+      if (user.password_hash.startsWith('$2')) {
+        // It's a bcrypt hash
+        try {
+          isPasswordValid = await bcrypt.compare(password, user.password_hash);
+          console.log('🔐 Bcrypt comparison result for password_hash field:', isPasswordValid);
+        } catch (bcryptError) {
+          console.error('❌ Bcrypt compare error:', bcryptError.message);
+        }
+      } else {
+        // password_hash is plain text
+        isPasswordValid = password === user.password_hash;
+        console.log('🔐 Plain text comparison result for password_hash field:', isPasswordValid);
+        
+        // If valid, hash the password for future use
+        if (isPasswordValid) {
+          console.log('⚠️ password_hash is stored as plain text! Hashing it now...');
+          const salt = await bcrypt.genSalt(10);
+          const hashedPassword = await bcrypt.hash(password, salt);
+          await user.update({ password: hashedPassword, password_hash: hashedPassword });
+          console.log('✅ Password hashed and updated in database');
+        }
       }
     }
 

@@ -303,7 +303,7 @@ const getAllUsers = async (req, res) => {
       include: [{ 
         model: Passport, 
         as: 'passport',
-        attributes: ['id', 'token_number', 'passport_number', 'nationality']
+        attributes: ['id', 'token_number', 'passport_number', 'nationality','passport_image_url']
       }],
       order: [['created_at', 'DESC']]
     });
