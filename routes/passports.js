@@ -34,7 +34,7 @@ const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|pdf/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
-  
+
   if (mimetype && extname) {
     cb(null, true);
   } else {
@@ -42,11 +42,39 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Create upload instance
+// Create upload instance for passports
 const upload = multer({
   storage: storage,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
+  },
+  fileFilter: fileFilter
+});
+
+// ====================
+// PAYMENT SCREENSHOTS CONFIG
+// ====================
+const paymentScreenshotsDir = path.join(__dirname, '../uploads/payment-screenshots');
+if (!fs.existsSync(paymentScreenshotsDir)) {
+  fs.mkdirSync(paymentScreenshotsDir, { recursive: true });
+  console.log('✅ Created payment screenshots directory:', paymentScreenshotsDir);
+}
+
+const paymentStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, paymentScreenshotsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, 'payment-' + uniqueSuffix + ext);
+  }
+});
+
+const paymentUpload = multer({
+  storage: paymentStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
   },
   fileFilter: fileFilter
 });
@@ -93,6 +121,46 @@ router.post('/upload', upload.single('passportImage'), async (req, res) => {
 
   } catch (error) {
     console.error('❌ Upload error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'File upload failed',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/passports/upload-payment-screenshot - Upload payment screenshot
+router.post('/upload-payment-screenshot', paymentUpload.single('screenshot'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    const filePath = `/uploads/payment-screenshots/${req.file.filename}`;
+    const fileUrl = `${req.protocol}://${req.get('host')}${filePath}`;
+
+    console.log('💳 Payment screenshot uploaded:', {
+      filename: req.file.filename,
+      path: req.file.path,
+      filePath: filePath
+    });
+
+    res.json({
+      success: true,
+      message: 'Payment screenshot uploaded successfully',
+      data: {
+        fileName: req.file.filename,
+        filePath: filePath,
+        fileUrl: fileUrl,
+        url: filePath // For compatibility with frontend
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Payment screenshot upload error:', error);
     res.status(500).json({
       success: false,
       message: 'File upload failed',
@@ -166,9 +234,9 @@ router.post('/verify-labor', async (req, res) => {
     }
 
     const passport = await Passport.findOne({
-      where: { 
+      where: {
         passport_number,
-        nationality 
+        nationality
       },
       include: [{ model: User, as: 'user' }]
     });
@@ -208,7 +276,7 @@ router.delete('/upload/:filename', async (req, res) => {
   try {
     const filename = req.params.filename;
     const filePath = path.join(passportPhotosDir, filename); // Updated path
-    
+
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
       res.json({

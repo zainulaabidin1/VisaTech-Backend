@@ -13,6 +13,8 @@ const { syncDatabase } = require('./models');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const passportRoutes = require('./routes/passports');
+const paymentRoutes = require('./routes/payments');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -48,7 +50,7 @@ const helmetConfig = helmet({
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: false,
   crossOriginResourcePolicy: false,
-  
+
   // Configure Content Security Policy
   contentSecurityPolicy: {
     directives: {
@@ -84,12 +86,12 @@ app.use('/uploads', express.static(uploadsDir, {
     // Allow CORS for images
     res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    
+
     // Security headers that allow embedding (since helmet is skipped)
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
     res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
-    
+
     // Cache control for images
     if (filePath.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
       res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 day
@@ -103,6 +105,8 @@ app.use('/uploads', express.static(uploadsDir, {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/passports', passportRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Test endpoints for debugging
 app.get('/api/test-uploads', (req, res) => {
@@ -124,10 +128,10 @@ app.get('/api/test-uploads', (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Server is running', 
-    timestamp: new Date().toISOString() 
+  res.json({
+    success: true,
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -156,10 +160,10 @@ const startServer = async () => {
   try {
     // Test database connection
     await testConnection();
-    
+
     // Sync database
     await syncDatabase();
-    
+
     // Start server
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

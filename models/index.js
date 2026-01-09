@@ -3,6 +3,7 @@ const User = require('./User');
 const Passport = require('./Passport');
 const EmailVerification = require('./EmailVerification');
 const Session = require('./Session');
+const Payment = require('./Payment');
 
 // Define relationships
 User.hasOne(Passport, { foreignKey: 'user_id', as: 'passport' });
@@ -13,6 +14,10 @@ EmailVerification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
 User.hasMany(Session, { foreignKey: 'user_id', as: 'sessions' });
 Session.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// Payment relationships
+User.hasOne(Payment, { foreignKey: 'user_id', as: 'payment' });
+Payment.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
 const syncDatabase = async () => {
   try {
@@ -29,5 +34,6 @@ module.exports = {
   Passport,
   EmailVerification,
   Session,
+  Payment,
   syncDatabase
 };

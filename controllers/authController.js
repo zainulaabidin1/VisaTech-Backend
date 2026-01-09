@@ -6,8 +6,8 @@ const login = async (req, res) => {
   try {
     const { email, phone, password } = req.body;
 
-    console.log('📥 Login attempt received:', { 
-      email: email || 'not provided', 
+    console.log('📥 Login attempt received:', {
+      email: email || 'not provided',
       phone: phone || 'not provided'
     });
 
@@ -20,13 +20,13 @@ const login = async (req, res) => {
     }
 
     // Find user by email or phone
-    const whereCondition = email 
-      ? { email: email.trim().toLowerCase() } 
+    const whereCondition = email
+      ? { email: email.trim().toLowerCase() }
       : { phone: phone.replace(/\D/g, '') };
-    
+
     console.log('🔍 Database query condition:', whereCondition);
 
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       where: whereCondition
     });
 
@@ -68,7 +68,7 @@ const login = async (req, res) => {
     console.log('Input password length:', password.length);
     console.log('Stored password field:', user.password ? 'exists' : 'null/undefined');
     console.log('Stored password_hash field:', user.password_hash ? 'exists' : 'null/undefined');
-    
+
     // NEW: Check if user has a password at all
     const hasPassword = !!(user.password || user.password_hash);
     if (!hasPassword) {
@@ -80,7 +80,7 @@ const login = async (req, res) => {
     }
 
     let isPasswordValid = false;
-    
+
     // Try password field first
     if (user.password) {
       if (user.password.startsWith('$2')) {
@@ -95,7 +95,7 @@ const login = async (req, res) => {
         // Password is plain text (for existing users before hashing)
         isPasswordValid = password === user.password;
         console.log('🔐 Plain text comparison result for password field:', isPasswordValid);
-        
+
         // If valid, hash the password for future use
         if (isPasswordValid) {
           console.log('⚠️ Password is stored as plain text! Hashing it now...');
@@ -106,7 +106,7 @@ const login = async (req, res) => {
         }
       }
     }
-    
+
     // If password field didn't work, try password_hash field
     if (!isPasswordValid && user.password_hash) {
       if (user.password_hash.startsWith('$2')) {
@@ -121,7 +121,7 @@ const login = async (req, res) => {
         // password_hash is plain text
         isPasswordValid = password === user.password_hash;
         console.log('🔐 Plain text comparison result for password_hash field:', isPasswordValid);
-        
+
         // If valid, hash the password for future use
         if (isPasswordValid) {
           console.log('⚠️ password_hash is stored as plain text! Hashing it now...');
@@ -160,6 +160,7 @@ const login = async (req, res) => {
       fullName: `${user.first_name} ${user.last_name}`.trim(),
       isVerified: user.is_verified,
       isActive: user.is_active,
+      role: user.role || 'user',
       createdAt: user.created_at
     };
 

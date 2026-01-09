@@ -15,8 +15,8 @@ router.post('/verify-email', async (req, res) => {
   try {
     const { email, verification_code } = req.body;
 
-    console.log('📧 Verifying email OTP:', { 
-      email, 
+    console.log('📧 Verifying email OTP:', {
+      email,
       verification_code,
       code_length: verification_code ? verification_code.length : 0
     });
@@ -93,7 +93,7 @@ router.post('/resend-otp', async (req, res) => {
 
     // Generate new verification code
     const verificationCode = generateVerificationCode();
-    const expiresAt = new Date(Date.now() + 3 * 60 * 1000); // 3 minutes
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes (consistent with userController)
 
     // Save verification code to database
     await EmailVerification.create({
@@ -260,7 +260,7 @@ router.post('/logout', authenticate, async (req, res) => {
     await user.save();
 
     console.log('👋 User logged out:', user.email);
-    
+
     res.json({
       success: true,
       message: 'Logged out successfully'
@@ -286,10 +286,10 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ 
-      where: { email: email.toLowerCase().trim() } 
+    const user = await User.findOne({
+      where: { email: email.toLowerCase().trim() }
     });
-    
+
     if (!user) {
       // For security, don't reveal if user exists
       return res.json({
@@ -349,7 +349,7 @@ router.post('/reset-password', async (req, res) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     if (decoded.type !== 'password_reset') {
       return res.status(400).json({
         success: false,
@@ -408,21 +408,21 @@ router.get('/debug/:email', async (req, res) => {
   try {
     const { email } = req.params;
     const decodedEmail = decodeURIComponent(email);
-    
+
     console.log('🔍 Debug request for:', decodedEmail);
-    
+
     const verifications = await EmailVerification.findAll({
       where: { email: decodedEmail },
       order: [['created_at', 'DESC']],
       raw: true
     });
-    
+
     const user = await User.findOne({
       where: { email: decodedEmail },
       raw: true,
       attributes: { exclude: ['password', 'password_hash'] }
     });
-    
+
     const result = {
       success: true,
       currentTime: new Date().toISOString(),
@@ -430,9 +430,9 @@ router.get('/debug/:email', async (req, res) => {
       verificationCount: verifications.length,
       verifications: verifications
     };
-    
+
     res.json(result);
-    
+
   } catch (error) {
     console.error('Debug error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -443,19 +443,19 @@ router.get('/debug/:email', async (req, res) => {
 router.post('/debug-user', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     console.log('🔍 Debug user lookup:', { email, password });
-    
+
     // Find user
     const user = await User.findOne({
-      where: { 
-        email: email.toLowerCase().trim() 
+      where: {
+        email: email.toLowerCase().trim()
       },
       raw: true
     });
-    
+
     console.log('🔍 User found in database:', user);
-    
+
     if (user) {
       console.log('🔐 User password field:', {
         hasPasswordField: !!user.password,
@@ -463,22 +463,22 @@ router.post('/debug-user', async (req, res) => {
         passwordLength: user.password ? user.password.length : 'N/A',
         passwordHashLength: user.password_hash ? user.password_hash.length : 'N/A'
       });
-      
+
       // Test password comparison
       const bcrypt = require('bcryptjs');
       let passwordValid = false;
-      
+
       if (user.password) {
         passwordValid = await bcrypt.compare(password, user.password);
         console.log('🔐 Password check with "password" field:', passwordValid);
       }
-      
+
       if (user.password_hash && !passwordValid) {
         passwordValid = await bcrypt.compare(password, user.password_hash);
         console.log('🔐 Password check with "password_hash" field:', passwordValid);
       }
     }
-    
+
     res.json({
       success: true,
       userExists: !!user,
@@ -492,7 +492,7 @@ router.post('/debug-user', async (req, res) => {
         hasPasswordHash: !!user.password_hash
       } : null
     });
-    
+
   } catch (error) {
     console.error('Debug error:', error);
     res.status(500).json({ success: false, error: error.message });

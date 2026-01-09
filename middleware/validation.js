@@ -34,7 +34,16 @@ const validatePersonalInfo = [
 ];
 
 const validateContactInfo = [
-  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+  // IMPORTANT: Disable gmail_remove_dots to preserve email exactly as entered
+  // Gmail treats dots as optional, but we should store email as user entered it
+  body('email').isEmail().normalizeEmail({
+    gmail_remove_dots: false,
+    gmail_remove_subaddress: false,
+    outlookdotcom_remove_subaddress: false,
+    yahoo_remove_subaddress: false,
+    icloud_remove_subaddress: false,
+    all_lowercase: true
+  }).withMessage('Valid email is required'),
   body('phone').isLength({ min: 10 }).withMessage('Phone number must be at least 10 digits'),
   body('countryCode').notEmpty().withMessage('Country code is required'),
   handleValidationErrors
@@ -45,21 +54,21 @@ const validateLogin = [
   // Custom validation for email/phone
   (req, res, next) => {
     const { email, phone } = req.body;
-    
+
     if (!email && !phone) {
       return res.status(400).json({
         success: false,
         message: 'Email or phone is required'
       });
     }
-    
+
     if (email && !/\S+@\S+\.\S+/.test(email)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid email format'
       });
     }
-    
+
     next();
   },
   handleValidationErrors

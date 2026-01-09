@@ -2,6 +2,7 @@ const { sequelize, User, Passport, EmailVerification } = require('../models');
 const { Op } = require('sequelize');
 const { generateVerificationCode } = require('../utils/generateCode');
 const { sendVerificationEmail } = require('../utils/emailService');
+const bcrypt = require('bcryptjs');
 
 const updatePersonalInfo = async (req, res) => {
   try {
@@ -14,12 +15,12 @@ const updatePersonalInfo = async (req, res) => {
       personalPhoto
     } = req.body;
 
-    console.log('📥 Received personal info data:', { 
-      nationalId, education, experience, certification 
+    console.log('📥 Received personal info data:', {
+      nationalId, education, experience, certification
     });
 
     // Find the most recently created user
-    let user = await User.findOne({ 
+    let user = await User.findOne({
       order: [['created_at', 'DESC']]
     });
 
@@ -41,9 +42,14 @@ const updatePersonalInfo = async (req, res) => {
       personal_photo_url: personalPhoto
     };
 
-    // Only update password if provided (it will be hashed automatically by model hook)
+    // Only update password if provided - MANUALLY HASH since User.update() doesn't trigger hooks
     if (password) {
-      updateData.password_hash = password;
+      console.log('🔐 Hashing password before saving...');
+      const salt = await bcrypt.genSalt(12);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      updateData.password_hash = hashedPassword;
+      updateData.password = hashedPassword; // Also set password field for login compatibility
+      console.log('✅ Password hashed successfully');
     }
 
     // Update user with personal information
@@ -68,7 +74,7 @@ const updatePersonalInfo = async (req, res) => {
     res.json({
       success: true,
       message: 'Personal information saved successfully',
-      data: { 
+      data: {
         user: {
           id: updatedUser.id,
           nationalId: updatedUser.national_id,
@@ -82,7 +88,7 @@ const updatePersonalInfo = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Personal info update error:', error);
-    
+
     if (error.name === 'SequelizeValidationError') {
       return res.status(400).json({
         success: false,
@@ -111,7 +117,7 @@ const updateContactInfo = async (req, res) => {
     console.log('📥 Received contact info data:', { email, phone, countryCode });
 
     // Find the most recently created user
-    let user = await User.findOne({ 
+    let user = await User.findOne({
       order: [['created_at', 'DESC']]
     });
 
@@ -126,13 +132,13 @@ const updateContactInfo = async (req, res) => {
 
     // Check if the new email already exists for a different user
     if (email && email !== user.email) {
-      const existingUser = await User.findOne({ 
-        where: { 
+      const existingUser = await User.findOne({
+        where: {
           email: email,
           id: { [Op.ne]: user.id }
-        } 
+        }
       });
-      
+
       if (existingUser) {
         return res.status(400).json({
           success: false,
@@ -174,10 +180,10 @@ const updateContactInfo = async (req, res) => {
         const emailSent = await sendVerificationEmail(email, verificationCode);
         otpSent = emailSent;
 
-        console.log('📨 OTP email status:', { 
-          email, 
-          code: verificationCode, 
-          emailSent 
+        console.log('📨 OTP email status:', {
+          email,
+          code: verificationCode,
+          emailSent
         });
 
       } catch (emailError) {
@@ -214,10 +220,10 @@ const updateContactInfo = async (req, res) => {
 
     res.json({
       success: true,
-      message: otpSent 
-        ? 'Contact information saved and verification code sent to your email' 
+      message: otpSent
+        ? 'Contact information saved and verification code sent to your email'
         : 'Contact information saved successfully',
-      data: { 
+      data: {
         user: {
           id: updatedUser.id,
           email: updatedUser.email,
@@ -241,7 +247,7 @@ const updateContactInfo = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     // Find the most recently created user
-    let user = await User.findOne({ 
+    let user = await User.findOne({
       order: [['created_at', 'DESC']],
       attributes: { exclude: ['password_hash'] },
       include: [{ model: Passport, as: 'passport' }]
@@ -300,10 +306,10 @@ const getAllUsers = async (req, res) => {
   try {
     const users = await User.findAll({
       attributes: { exclude: ['password_hash'] },
-      include: [{ 
-        model: Passport, 
+      include: [{
+        model: Passport,
         as: 'passport',
-        attributes: ['id', 'token_number', 'passport_number', 'nationality','passport_image_url']
+        attributes: ['id', 'token_number', 'passport_number', 'nationality', 'passport_image_url']
       }],
       order: [['created_at', 'DESC']]
     });
@@ -348,7 +354,7 @@ const updateUser = async (req, res) => {
     // Handle passport token number
     if (passport && passport.token_number) {
       console.log('📝 Processing token number:', passport.token_number);
-      
+
       try {
         // Check if passport exists for this user
         let passportRecord = await Passport.findOne({
@@ -369,7 +375,7 @@ const updateUser = async (req, res) => {
             token_number: passport.token_number,
             passport_number: 'TEMP',
             country: 'Unknown',
-            nationality: 'Unknown', 
+            nationality: 'Unknown',
             date_of_birth: new Date(),
             expiry_date: new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000),
             sex: 'U',
@@ -403,7 +409,7 @@ const updateUser = async (req, res) => {
     console.error('❌ Update user error:', error);
     console.error('❌ Error name:', error.name);
     console.error('❌ Error message:', error.message);
-    
+
     if (error.name === 'SequelizeValidationError') {
       return res.status(400).json({
         success: false,

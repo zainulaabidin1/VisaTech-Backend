@@ -24,6 +24,10 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  password: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   first_name: {
     type: DataTypes.STRING(100),
     allowNull: false
@@ -75,26 +79,44 @@ const User = sequelize.define('User', {
   is_active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  role: {
+    type: DataTypes.ENUM('user', 'admin'),
+    defaultValue: 'user'
   }
 }, {
   tableName: 'users',
   hooks: {
     beforeCreate: async (user) => {
-      if (user.password_hash) {
-        user.password_hash = await bcrypt.hash(user.password_hash, 12);
+      // Hash password_hash if it's plain text (not already hashed)
+      if (user.password_hash && !user.password_hash.startsWith('$2')) {
+        const hashedPassword = await bcrypt.hash(user.password_hash, 12);
+        user.password_hash = hashedPassword;
+        user.password = hashedPassword; // Keep both in sync
       }
     },
     beforeUpdate: async (user) => {
-      if (user.changed('password_hash')) {
-        user.password_hash = await bcrypt.hash(user.password_hash, 12);
+      // Only hash if password_hash changed AND it's not already hashed
+      if (user.changed('password_hash') && user.password_hash && !user.password_hash.startsWith('$2')) {
+        const hashedPassword = await bcrypt.hash(user.password_hash, 12);
+        user.password_hash = hashedPassword;
+        user.password = hashedPassword; // Keep both in sync
       }
     }
   }
 });
 
-// Instance method to check password
-User.prototype.checkPassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password_hash);
+// Instance method to check password - checks both fields for compatibility
+User.prototype.checkPassword = async function (candidatePassword) {
+  // Try password_hash first (primary field)
+  if (this.password_hash && this.password_hash.startsWith('$2')) {
+    return await bcrypt.compare(candidatePassword, this.password_hash);
+  }
+  // Fall back to password field
+  if (this.password && this.password.startsWith('$2')) {
+    return await bcrypt.compare(candidatePassword, this.password);
+  }
+  return false;
 };
 
 module.exports = User;
