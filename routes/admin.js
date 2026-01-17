@@ -80,6 +80,8 @@ router.get('/users', async (req, res) => {
                 passport: user.passport ? {
                     id: user.passport.id,
                     passportNumber: user.passport.passport_number,
+                    tokenNumber: user.passport.token_number,
+                    passportImageUrl: user.passport.passport_image_url,
                     expiryDate: user.passport.expiry_date,
                     issuingCountry: user.passport.issuing_country,
                     frontImageUrl: user.passport.front_image_url,
@@ -234,6 +236,84 @@ router.put('/users/:id/set-amount', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to set payment amount'
+        });
+    }
+});
+
+/**
+ * @route   PUT /api/admin/users/:id/set-token
+ * @desc    Set token number for a user's passport
+ * @access  Private (Admin)
+ */
+router.put('/users/:id/set-token', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { tokenNumber } = req.body;
+
+        if (!tokenNumber || !tokenNumber.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token number is required'
+            });
+        }
+
+        // Find user
+        const user = await User.findByPk(id, {
+            include: [{ model: Passport, as: 'passport' }]
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Check if passport exists
+        if (!user.passport) {
+            return res.status(400).json({
+                success: false,
+                message: 'User does not have a passport record. Passport must be uploaded first.'
+            });
+        }
+
+        // Check if token is already assigned to another passport
+        const existingToken = await Passport.findOne({
+            where: {
+                token_number: tokenNumber.trim(),
+                id: { [Op.ne]: user.passport.id }
+            }
+        });
+
+        if (existingToken) {
+            return res.status(400).json({
+                success: false,
+                message: 'This token number is already assigned to another user'
+            });
+        }
+
+        // Update passport with token number
+        await user.passport.update({
+            token_number: tokenNumber.trim()
+        });
+
+        console.log(`✅ Admin set token ${tokenNumber} for user:`, user.email);
+
+        res.json({
+            success: true,
+            message: 'Token number set successfully',
+            data: {
+                userId: id,
+                passportId: user.passport.id,
+                tokenNumber: tokenNumber.trim()
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error setting token:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to set token number'
         });
     }
 });
